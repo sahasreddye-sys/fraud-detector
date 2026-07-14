@@ -10,7 +10,661 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 
-<link rel="stylesheet" href="css/style.css">
+<style>
+/* ============================================================
+   TOKENS
+   ============================================================ */
+:root {
+  --paper: #F4F6F1;
+  --paper-line: #DCE8DC;
+  --paper-line-strong: #C7D6C4;
+  --ink: #1B2A3C;
+  --ink-soft: #4A5A6B;
+  --ink-faint: #54636F;
+  --flag-red: #B23A2E;
+  --flag-red-soft: #D9CFC7;
+  --approve-green: #3F6B4F;
+  --brass: #8C6A22;
+  --brass-fill: #A9822F;
+  --rule: #C7D2C2;
+  --card: #FFFFFF;
+
+  --font-display: 'Fraunces', 'Iowan Old Style', serif;
+  --font-body: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+
+  --wrap: 1120px;
+}
+
+* { box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  position: relative;
+}
+
+.mono { font-family: var(--font-mono); }
+
+/* subtle paper grain, no external image */
+.grain {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.5;
+  background-image:
+    repeating-linear-gradient(180deg, rgba(63,107,79,0.035) 0px, rgba(63,107,79,0.035) 1px, transparent 1px, transparent 28px);
+}
+
+.wrap {
+  max-width: var(--wrap);
+  margin: 0 auto;
+  padding: 0 28px;
+  position: relative;
+  z-index: 1;
+}
+
+a { color: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 3px;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  color: var(--ink);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+h2 {
+  font-size: clamp(1.9rem, 3.4vw, 2.75rem);
+  font-weight: 600;
+  margin-bottom: 2rem;
+  max-width: 18ch;
+}
+
+h3 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+p { margin: 0 0 1rem; color: var(--ink-soft); }
+p:last-child { margin-bottom: 0; }
+
+strong { color: var(--ink); font-weight: 600; }
+
+/* ============================================================
+   TOPBAR
+   ============================================================ */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(244, 246, 241, 0.92);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--rule);
+}
+
+.topbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+}
+
+.case-number {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+
+.topnav {
+  display: flex;
+  gap: 1.6rem;
+}
+
+.topnav a {
+  font-size: 0.85rem;
+  text-decoration: none;
+  color: var(--ink-soft);
+  border-bottom: 1px solid transparent;
+  padding-bottom: 2px;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.topnav a:hover { color: var(--ink); border-color: var(--brass); }
+
+@media (max-width: 720px) {
+  .topnav { display: none; }
+}
+
+/* ============================================================
+   HERO
+   ============================================================ */
+.hero {
+  padding: 4.5rem 0 4rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 3.5rem;
+  align-items: center;
+}
+
+@media (max-width: 900px) {
+  .hero-grid { grid-template-columns: 1fr; gap: 2.5rem; }
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--approve-green);
+  margin-bottom: 1rem;
+}
+
+.hero h1 {
+  font-size: clamp(2.6rem, 6vw, 4.3rem);
+  line-height: 1.02;
+  font-weight: 700;
+  margin-bottom: 1.4rem;
+}
+
+.hero-lede {
+  font-size: 1.08rem;
+  max-width: 46ch;
+  margin-bottom: 2rem;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 0.75rem 1.3rem;
+  border-radius: 3px;
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-primary {
+  background: var(--ink);
+  color: var(--paper);
+}
+.btn-primary:hover { background: #2A3C51; transform: translateY(-1px); }
+
+.btn-ghost {
+  border: 1px solid var(--ink);
+  color: var(--ink);
+}
+.btn-ghost:hover { border-color: var(--brass); color: var(--brass); transform: translateY(-1px); }
+
+/* ---- Ledger panel ---- */
+.ledger-panel {
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  box-shadow: 0 18px 40px -24px rgba(27, 42, 60, 0.35);
+  overflow: hidden;
+}
+
+.ledger-head {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.7rem 1rem;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+}
+
+.ledger-cols {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr 0.8fr 0.8fr 1fr;
+  padding: 0.6rem 1rem 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.05em;
+  color: var(--ink-faint);
+  border-bottom: 1px solid var(--rule);
+}
+
+.ledger-rows {
+  height: 260px;
+  overflow: hidden;
+  position: relative;
+  background-image: repeating-linear-gradient(180deg, transparent 0, transparent 31px, var(--paper-line) 31px, var(--paper-line) 62px);
+}
+
+.ledger-row {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr 0.8fr 0.8fr 1fr;
+  padding: 0.5rem 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  align-items: center;
+  border-bottom: 1px solid rgba(199, 210, 194, 0.5);
+  animation: rowIn 0.4s ease;
+}
+
+@keyframes rowIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ledger-row .status-clear { color: var(--approve-green); font-weight: 600; }
+.ledger-row .status-flag {
+  color: var(--flag-red);
+  font-weight: 700;
+  position: relative;
+}
+
+.ledger-row.is-flagged {
+  background: rgba(178, 58, 46, 0.06);
+}
+
+.stamp-pop {
+  position: absolute;
+  right: 0;
+  top: -6px;
+  border: 1.5px solid var(--flag-red);
+  color: var(--flag-red);
+  padding: 0px 5px;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  border-radius: 2px;
+  transform: rotate(-6deg) scale(0.7);
+  opacity: 0;
+  animation: stampIn 0.35s ease forwards 0.15s;
+}
+
+@keyframes stampIn {
+  to { transform: rotate(-6deg) scale(1); opacity: 1; }
+}
+
+.ledger-note {
+  padding: 0.6rem 1rem 0.85rem;
+  font-size: 0.72rem;
+  color: var(--ink-faint);
+  margin: 0;
+  border-top: 1px solid var(--rule);
+}
+
+/* ============================================================
+   SECTIONS
+   ============================================================ */
+.section {
+  padding: 5.5rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.section-alt { background: #EEF2E9; }
+
+.section-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brass);
+  margin-bottom: 0.6rem;
+}
+
+.section-note {
+  max-width: 62ch;
+  margin-bottom: 2.2rem;
+}
+
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem;
+  align-items: center;
+}
+
+@media (max-width: 800px) {
+  .two-col { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   PIPELINE (approach)
+   ============================================================ */
+.pipeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1.6rem;
+}
+
+.pipeline li {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 1.2rem;
+  padding-bottom: 1.6rem;
+  border-bottom: 1px dashed var(--paper-line-strong);
+}
+
+.pipeline li:last-child { border-bottom: none; padding-bottom: 0; }
+
+.pipeline-num {
+  font-family: var(--font-mono);
+  font-size: 1.6rem;
+  font-weight: 500;
+  color: var(--paper-line-strong);
+}
+
+.pipeline h3 { margin-bottom: 0.3rem; }
+.pipeline p { max-width: 62ch; }
+
+/* ============================================================
+   RESULTS
+   ============================================================ */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+  padding: 2rem 0;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+
+@media (max-width: 800px) {
+  .stat-row { grid-template-columns: repeat(2, 1fr); }
+}
+
+.stat { text-align: left; }
+
+.stat-value {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: clamp(2rem, 4vw, 2.9rem);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.model-compare { max-width: 680px; }
+
+.chart-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.figure-caption {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--ink-faint);
+  margin-top: 0.6rem;
+}
+
+/* SVG chart element styling */
+.axis-line { stroke: var(--ink-faint); stroke-width: 1; }
+.diag-line { stroke: var(--paper-line-strong); stroke-width: 1; stroke-dasharray: 4 4; }
+.threshold-line { stroke: var(--brass); stroke-width: 1.5; stroke-dasharray: 3 3; }
+.axis-label, .axis-caption, .bar-label, .row-label, .fi-label, .cm-sub {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  fill: var(--ink-faint);
+}
+.bar-value, .bar-value-inline, .cm-num {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  fill: var(--ink);
+  font-weight: 600;
+}
+.bar-legit { fill: var(--approve-green); opacity: 0.85; }
+.bar-fraud { fill: var(--flag-red); }
+.curve-line { fill: none; stroke: var(--approve-green); stroke-width: 2; }
+.curve-flag { stroke: var(--flag-red); }
+.curve-dot { fill: none; stroke: var(--approve-green); stroke-width: 2; stroke-linecap: round; }
+
+.bar-track { fill: var(--paper-line); }
+.bar-fill { fill: var(--approve-green); opacity: 0.8; }
+.bar-fill-strong { fill: var(--flag-red); opacity: 0.9; }
+
+.cm-cell { stroke: var(--paper); stroke-width: 2; }
+.cm-cool { fill: #DCE8DC; }
+.cm-warm-lite { fill: #F1E4D8; }
+.cm-warm { fill: #E7B9AF; }
+
+.fi-bar { fill: var(--brass-fill); opacity: 0.85; }
+
+/* ============================================================
+   GALLERY
+   ============================================================ */
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.6rem;
+}
+
+@media (max-width: 900px) {
+  .gallery { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 620px) {
+  .gallery { grid-template-columns: 1fr; }
+}
+
+.gallery-card {
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 1.2rem 1.2rem 1.4rem;
+  margin: 0;
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.gallery-card.is-visible { opacity: 1; transform: translateY(0); }
+
+.gallery-card figcaption {
+  margin-top: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.gallery-card figcaption strong { font-size: 0.92rem; }
+.gallery-card figcaption span { font-size: 0.82rem; color: var(--ink-soft); }
+
+/* ============================================================
+   CASE CARDS (SHAP reasoning)
+   ============================================================ */
+.case-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.4rem;
+}
+
+@media (max-width: 900px) {
+  .case-cards { grid-template-columns: 1fr; }
+}
+
+.case-card {
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--flag-red);
+  border-radius: 4px;
+  padding: 1.3rem 1.3rem 1.5rem;
+}
+
+.case-card-clear { border-left-color: var(--approve-green); }
+
+.case-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.stamp {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  color: var(--flag-red);
+  border: 1.5px solid var(--flag-red);
+  border-radius: 2px;
+  padding: 2px 6px;
+  transform: rotate(-3deg);
+}
+
+.stamp-clear { color: var(--approve-green); border-color: var(--approve-green); }
+
+.case-card-body {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+  margin: 0 0 1.1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px dashed var(--paper-line-strong);
+}
+
+.case-card-body div { display: flex; flex-direction: column; gap: 2px; }
+
+.case-card-body dt {
+  font-size: 0.68rem;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.case-card-body dd { margin: 0; font-size: 0.88rem; }
+
+.reason-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.reason-list li {
+  position: relative;
+  padding-left: 0;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.reason-bar {
+  display: block;
+  height: 5px;
+  border-radius: 2px;
+  background: var(--flag-red);
+  width: var(--w, 40%);
+  opacity: 0.75;
+}
+
+.reason-bar-clear { background: var(--approve-green); }
+
+/* ============================================================
+   STACK
+   ============================================================ */
+.stack-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0;
+}
+
+.stack-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 0;
+  border-bottom: 1px solid var(--rule);
+  flex-wrap: wrap;
+}
+
+.stack-list li span:first-child {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.stack-list li span:last-child {
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+}
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+.footer {
+  padding: 2.5rem 0;
+}
+
+.footer-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.footer p {
+  font-size: 0.85rem;
+  color: var(--ink-faint);
+  margin: 0;
+}
+
+.footer-links {
+  display: flex;
+  gap: 1.2rem;
+}
+
+.footer-links a {
+  font-size: 0.85rem;
+  text-decoration: none;
+  color: var(--ink-soft);
+}
+.footer-links a:hover { color: var(--brass); }
+
+</style>
 </head>
 <body>
 
@@ -174,8 +828,8 @@
       <h2>Headline numbers.</h2>
       <p class="section-note">
         From the tuned ensemble, evaluated on a held-out, time-ordered test split
-        (the model never sees a transaction before ones it trained on). <strong>Replace these
-        with your own notebook's numbers before sharing.</strong>
+        of 56,962 transactions (the model never sees a transaction before ones it
+        trained on).
       </p>
       <div class="stat-row">
         <div class="stat">
@@ -203,20 +857,20 @@
           <g class="compare-row">
             <text x="160" y="34" class="row-label" text-anchor="end">LightGBM</text>
             <rect x="170" y="20" width="410" height="24" class="bar-track"/>
-            <rect x="170" y="20" width="308" height="24" class="bar-fill"/>
+            <rect x="170" y="20" width="316" height="24" class="bar-fill"/>
             <text x="590" y="37" class="bar-value-inline">0.77</text>
           </g>
           <g class="compare-row">
             <text x="160" y="74" class="row-label" text-anchor="end">XGBoost</text>
             <rect x="170" y="60" width="410" height="24" class="bar-track"/>
-            <rect x="170" y="60" width="346" height="24" class="bar-fill"/>
+            <rect x="170" y="60" width="344" height="24" class="bar-fill"/>
             <text x="590" y="77" class="bar-value-inline">0.84</text>
           </g>
           <g class="compare-row">
             <text x="160" y="114" class="row-label" text-anchor="end">CatBoost</text>
             <rect x="170" y="100" width="410" height="24" class="bar-track"/>
-            <rect x="170" y="100" width="343" height="24" class="bar-fill"/>
-            <text x="590" y="117" class="bar-value-inline">0.84</text>
+            <rect x="170" y="100" width="340" height="24" class="bar-fill"/>
+            <text x="590" y="117" class="bar-value-inline">0.83</text>
           </g>
           <g class="compare-row">
             <text x="160" y="154" class="row-label" text-anchor="end">3-model ensemble</text>
@@ -228,7 +882,7 @@
             <text x="160" y="194" class="row-label" text-anchor="end">+ Isolation Forest</text>
             <rect x="170" y="180" width="410" height="24" class="bar-track"/>
             <rect x="170" y="180" width="365" height="24" class="bar-fill bar-fill-strong"/>
-            <text x="590" y="197" class="bar-value-inline">0.89</text>
+            <text x="590" y="197" class="bar-value-inline">0.891</text>
           </g>
         </svg>
         <p class="figure-caption">Fig. 2 &mdash; PR&#8209;AUC by model, held&#8209;out test set</p>
@@ -274,9 +928,9 @@
               <rect x="50" y="100" width="90" height="80" class="cm-cell cm-warm-lite"/>
               <rect x="140" y="100" width="90" height="80" class="cm-cell cm-warm"/>
             </g>
-            <text x="95" y="65" class="cm-num" text-anchor="middle">56,832</text>
+            <text x="95" y="65" class="cm-num" text-anchor="middle">56,844</text>
             <text x="95" y="82" class="cm-sub" text-anchor="middle">true legit</text>
-            <text x="185" y="65" class="cm-num" text-anchor="middle">32</text>
+            <text x="185" y="65" class="cm-num" text-anchor="middle">20</text>
             <text x="185" y="82" class="cm-sub" text-anchor="middle">false flag</text>
             <text x="95" y="145" class="cm-num" text-anchor="middle">13</text>
             <text x="95" y="162" class="cm-sub" text-anchor="middle">missed</text>
@@ -426,6 +1080,148 @@
   </div>
 </footer>
 
-<script src="js/script.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var prefersReducedMotion = window.matchMedia &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ============================================================
+     LIVE LEDGER DEMO
+     Purely illustrative synthetic feed — not connected to any
+     real model. Flag rate is exaggerated so a visitor actually
+     sees a flagged row within a few seconds.
+     ============================================================ */
+  var ledgerEl = document.getElementById("ledger-rows");
+
+  function randomAmount() {
+    // mostly small transactions, occasional large one
+    var base = Math.random() < 0.9
+      ? Math.random() * 180 + 5
+      : Math.random() * 1800 + 300;
+    return base.toFixed(2);
+  }
+
+  function randomTime() {
+    var h = Math.floor(Math.random() * 24);
+    var m = Math.floor(Math.random() * 60);
+    return (h < 10 ? "0" + h : h) + ":" + (m < 10 ? "0" + m : m);
+  }
+
+  function randomId(counter) {
+    return "TX-" + String(10000 + counter).slice(-6);
+  }
+
+  var txCounter = 0;
+  var maxRows = 7;
+
+  function buildRow(isFlagged, amount, time, id) {
+    var row = document.createElement("div");
+    row.className = "ledger-row" + (isFlagged ? " is-flagged" : "");
+
+    var risk = isFlagged
+      ? (0.7 + Math.random() * 0.29).toFixed(2)
+      : (Math.random() * 0.35).toFixed(2);
+
+    row.innerHTML =
+      '<span class="mono">' + id + '</span>' +
+      '<span class="mono">$' + amount + '</span>' +
+      '<span class="mono">' + time + '</span>' +
+      '<span class="mono">' + risk + '</span>' +
+      '<span class="' + (isFlagged ? "status-flag" : "status-clear") + '">' +
+        (isFlagged ? 'FLAGGED<span class="stamp-pop">FLAG</span>' : "CLEAR") +
+      "</span>";
+
+    return row;
+  }
+
+  function pushRow() {
+    if (!ledgerEl) return;
+    txCounter += 1;
+    var isFlagged = Math.random() < 0.12; // exaggerated demo rate
+    var row = buildRow(isFlagged, randomAmount(), randomTime(), randomId(txCounter));
+    ledgerEl.appendChild(row);
+
+    while (ledgerEl.children.length > maxRows) {
+      ledgerEl.removeChild(ledgerEl.firstChild);
+    }
+  }
+
+  if (ledgerEl) {
+    // seed a few rows immediately so the panel isn't empty on load
+    for (var i = 0; i < 5; i++) pushRow();
+    if (!prefersReducedMotion) {
+      window.setInterval(pushRow, 1400);
+    }
+  }
+
+  /* ============================================================
+     STAT COUNT-UP
+     ============================================================ */
+  var statEls = document.querySelectorAll(".stat-value");
+
+  function animateStat(el) {
+    var target = parseFloat(el.getAttribute("data-target"));
+    if (isNaN(target)) return;
+    var suffix = el.getAttribute("data-suffix") || "";
+    var scale = parseFloat(el.getAttribute("data-scale")) || 1;
+    var displayTarget = target * scale;
+    var duration = 1100;
+    var start = null;
+
+    if (prefersReducedMotion) {
+      el.textContent = (suffix === "%" ? Math.round(displayTarget) : displayTarget.toFixed(3)) + suffix;
+      return;
+    }
+
+    function step(ts) {
+      if (start === null) start = ts;
+      var progress = Math.min((ts - start) / duration, 1);
+      var eased = 1 - Math.pow(1 - progress, 3);
+      var current = displayTarget * eased;
+      el.textContent = (suffix === "%" ? Math.round(current) : current.toFixed(3)) + suffix;
+      if (progress < 1) window.requestAnimationFrame(step);
+    }
+    window.requestAnimationFrame(step);
+  }
+
+  /* ============================================================
+     SCROLL REVEALS (gallery cards + stats)
+     ============================================================ */
+  if ("IntersectionObserver" in window) {
+    var revealObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("is-visible");
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.15 });
+
+    document.querySelectorAll(".gallery-card").forEach(function (card) {
+      revealObserver.observe(card);
+    });
+
+    var statObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          animateStat(entry.target);
+          statObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.4 });
+
+    statEls.forEach(function (el) { statObserver.observe(el); });
+  } else {
+    // fallback: no IntersectionObserver support — just show everything
+    document.querySelectorAll(".gallery-card").forEach(function (card) {
+      card.classList.add("is-visible");
+    });
+    statEls.forEach(animateStat);
+  }
+})();
+
+</script>
 </body>
 </html>
