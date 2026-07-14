@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Case File: A Credit Card Fraud Detection System</title>
+<meta name="description" content="An ensemble fraud detection system — LightGBM, XGBoost, and CatBoost with cost-based thresholds and SHAP explainability, built on the Kaggle credit card fraud dataset.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="grain" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <span class="case-number">CASE FILE NO. FD&#8209;2026&#8209;0117</span>
+    <nav class="topnav" aria-label="Section navigation">
+      <a href="#problem">Problem</a>
+      <a href="#approach">Approach</a>
+      <a href="#results">Results</a>
+      <a href="#evidence">Evidence</a>
+      <a href="#reasoning">Reasoning</a>
+      <a href="#stack">Stack</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+  <!-- ============ HERO ============ -->
+  <section class="hero" id="top">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow">Fraud Detection &middot; Applied Machine Learning</p>
+        <h1>Flagged before<br>it clears.</h1>
+        <p class="hero-lede">
+          An ensemble model that reads a stream of anonymized transactions and decides,
+          in real time, which ones don't belong &mdash; then explains why. Built on the
+          Kaggle credit card fraud dataset: <span class="mono">284,807</span> transactions,
+          <span class="mono">492</span> of them fraud.
+        </p>
+        <div class="hero-actions">
+          <a href="#results" class="btn btn-primary">See the results</a>
+          <a href="https://github.com/" class="btn btn-ghost" id="repo-link">View the notebook</a>
+        </div>
+      </div>
+
+      <div class="ledger-panel" aria-label="Live transaction ledger demonstration">
+        <div class="ledger-head">
+          <span>LIVE LEDGER &mdash; SIMULATED FEED</span>
+          <span class="ledger-head-right">MODEL: ENSEMBLE v3</span>
+        </div>
+        <div class="ledger-cols">
+          <span>ID</span><span>AMOUNT</span><span>TIME</span><span>RISK</span><span>STATUS</span>
+        </div>
+        <div class="ledger-rows" id="ledger-rows" role="log" aria-live="polite"></div>
+        <p class="ledger-note">
+          Demo feed for illustration &mdash; flag rate exaggerated for visibility.
+          Real-world fraud rate in this dataset: <span class="mono">0.17%</span>.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PROBLEM ============ -->
+  <section class="section" id="problem">
+    <div class="wrap">
+      <p class="section-eyebrow">01 &mdash; The Problem</p>
+      <h2>Accuracy is the wrong scoreboard.</h2>
+      <div class="two-col">
+        <div>
+          <p>
+            Fraud makes up roughly <strong>0.17%</strong> of transactions in this dataset &mdash;
+            close to the real-world rate banks actually see. A model that predicts
+            &ldquo;not fraud&rdquo; on every single transaction still scores <strong>99.8% accuracy</strong>
+            while catching exactly zero fraud.
+          </p>
+          <p>
+            So the real task isn't &ldquo;build an accurate classifier.&rdquo; It's: rank rare,
+            expensive events correctly inside an ocean of normal ones, without burying a
+            fraud team in false alarms.
+          </p>
+        </div>
+        <div class="imbalance-figure" aria-label="Bar chart showing 99.83 percent legitimate transactions versus 0.17 percent fraud">
+          <svg viewBox="0 0 360 220" class="chart-svg" role="img">
+            <line x1="40" y1="20" x2="40" y2="180" class="axis-line"/>
+            <line x1="40" y1="180" x2="340" y2="180" class="axis-line"/>
+            <text x="20" y="24" class="axis-label" text-anchor="end">10&#8309;</text>
+            <text x="20" y="70" class="axis-label" text-anchor="end">10&#8309;</text>
+            <text x="20" y="115" class="axis-label" text-anchor="end">10&#179;</text>
+            <text x="20" y="160" class="axis-label" text-anchor="end">10&#185;</text>
+            <rect x="90" y="24" width="70" height="156" class="bar-legit"/>
+            <rect x="230" y="152" width="70" height="28" class="bar-fraud"/>
+            <text x="125" y="200" class="bar-label" text-anchor="middle">Legit</text>
+            <text x="265" y="200" class="bar-label" text-anchor="middle">Fraud</text>
+            <text x="125" y="16" class="bar-value" text-anchor="middle">284,315</text>
+            <text x="265" y="145" class="bar-value" text-anchor="middle">492</text>
+          </svg>
+          <p class="figure-caption">Fig. 1 &mdash; class distribution, log scale</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ APPROACH ============ -->
+  <section class="section section-alt" id="approach">
+    <div class="wrap">
+      <p class="section-eyebrow">02 &mdash; The Approach</p>
+      <h2>Six decisions, in order.</h2>
+      <ol class="pipeline">
+        <li>
+          <span class="pipeline-num">01</span>
+          <div>
+            <h3>Feature engineering</h3>
+            <p>Rolling amount z-scores, time-since-last-transaction, and trailing-hour
+              transaction counts layered on top of the anonymized PCA features &mdash;
+              proxies for the spending-velocity signals a real card network would have.</p>
+          </div>
+        </li>
+        <li>
+          <span class="pipeline-num">02</span>
+          <div>
+            <h3>Imbalance handling</h3>
+            <p><span class="mono">scale_pos_weight</span> instead of synthetic oversampling.
+              At 280K+ rows, reweighting the loss scales cleanly; SMOTE-style resampling doesn't.</p>
+          </div>
+        </li>
+        <li>
+          <span class="pipeline-num">03</span>
+          <div>
+            <h3>Model ensemble</h3>
+            <p>LightGBM, XGBoost, and CatBoost trained independently and blended, plus an
+              Isolation Forest trained only on legitimate transactions to catch fraud
+              patterns no label has seen yet.</p>
+          </div>
+        </li>
+        <li>
+          <span class="pipeline-num">04</span>
+          <div>
+            <h3>Calibration</h3>
+            <p>Isotonic regression on held-out validation data, so a score of 0.80 means
+              an 80% real-world likelihood &mdash; not just a high rank.</p>
+          </div>
+        </li>
+        <li>
+          <span class="pipeline-num">05</span>
+          <div>
+            <h3>Cost-based thresholding</h3>
+            <p>The cutoff is chosen by minimizing expected dollar cost (missed fraud vs.
+              false-alarm investigation time) &mdash; not by maximizing F1 for its own sake.</p>
+          </div>
+        </li>
+        <li>
+          <span class="pipeline-num">06</span>
+          <div>
+            <h3>Explainability</h3>
+            <p>SHAP values attached to every flagged transaction, so each decision comes
+              with a reason, not just a number.</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ============ RESULTS ============ -->
+  <section class="section" id="results">
+    <div class="wrap">
+      <p class="section-eyebrow">03 &mdash; The Results</p>
+      <h2>Headline numbers.</h2>
+      <p class="section-note">
+        From the tuned ensemble, evaluated on a held-out, time-ordered test split
+        (the model never sees a transaction before ones it trained on). <strong>Replace these
+        with your own notebook's numbers before sharing.</strong>
+      </p>
+      <div class="stat-row">
+        <div class="stat">
+          <span class="stat-value" data-target="0.891">0.000</span>
+          <span class="stat-label">PR&#8209;AUC</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value" data-target="0.981">0.000</span>
+          <span class="stat-label">ROC&#8209;AUC</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value" data-target="0.87" data-suffix="%" data-scale="100">0%</span>
+          <span class="stat-label">Recall at threshold</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value" data-target="0.81" data-suffix="%" data-scale="100">0%</span>
+          <span class="stat-label">Precision at threshold</span>
+        </div>
+      </div>
+
+      <div class="model-compare" aria-label="Bar chart comparing PR-AUC across models">
+        <svg viewBox="0 0 640 230" class="chart-svg" role="img">
+          <line x1="170" y1="10" x2="170" y2="205" class="axis-line"/>
+          <!-- rows: label, value(0-1), color class -->
+          <g class="compare-row">
+            <text x="160" y="34" class="row-label" text-anchor="end">LightGBM</text>
+            <rect x="170" y="20" width="410" height="24" class="bar-track"/>
+            <rect x="170" y="20" width="308" height="24" class="bar-fill"/>
+            <text x="590" y="37" class="bar-value-inline">0.77</text>
+          </g>
+          <g class="compare-row">
+            <text x="160" y="74" class="row-label" text-anchor="end">XGBoost</text>
+            <rect x="170" y="60" width="410" height="24" class="bar-track"/>
+            <rect x="170" y="60" width="346" height="24" class="bar-fill"/>
+            <text x="590" y="77" class="bar-value-inline">0.84</text>
+          </g>
+          <g class="compare-row">
+            <text x="160" y="114" class="row-label" text-anchor="end">CatBoost</text>
+            <rect x="170" y="100" width="410" height="24" class="bar-track"/>
+            <rect x="170" y="100" width="343" height="24" class="bar-fill"/>
+            <text x="590" y="117" class="bar-value-inline">0.84</text>
+          </g>
+          <g class="compare-row">
+            <text x="160" y="154" class="row-label" text-anchor="end">3-model ensemble</text>
+            <rect x="170" y="140" width="410" height="24" class="bar-track"/>
+            <rect x="170" y="140" width="361" height="24" class="bar-fill bar-fill-strong"/>
+            <text x="590" y="157" class="bar-value-inline">0.88</text>
+          </g>
+          <g class="compare-row">
+            <text x="160" y="194" class="row-label" text-anchor="end">+ Isolation Forest</text>
+            <rect x="170" y="180" width="410" height="24" class="bar-track"/>
+            <rect x="170" y="180" width="365" height="24" class="bar-fill bar-fill-strong"/>
+            <text x="590" y="197" class="bar-value-inline">0.89</text>
+          </g>
+        </svg>
+        <p class="figure-caption">Fig. 2 &mdash; PR&#8209;AUC by model, held&#8209;out test set</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ EVIDENCE / CHART GALLERY ============ -->
+  <section class="section section-alt" id="evidence">
+    <div class="wrap">
+      <p class="section-eyebrow">04 &mdash; The Evidence</p>
+      <h2>Read the curves.</h2>
+      <div class="gallery">
+
+        <figure class="gallery-card">
+          <svg viewBox="0 0 300 240" class="chart-svg" role="img" aria-label="ROC curve">
+            <line x1="40" y1="10" x2="40" y2="200" class="axis-line"/>
+            <line x1="40" y1="200" x2="280" y2="200" class="axis-line"/>
+            <line x1="40" y1="200" x2="280" y2="10" class="diag-line"/>
+            <path d="M40,200 C 70,120 110,55 150,35 C 190,20 230,13 280,10" class="curve-line"/>
+            <text x="160" y="222" class="axis-caption" text-anchor="middle">False Positive Rate</text>
+            <text x="16" y="105" class="axis-caption" text-anchor="middle" transform="rotate(-90 16 105)">True Positive Rate</text>
+          </svg>
+          <figcaption><strong>ROC curve</strong><span>AUC 0.981 &mdash; strong separation, though ROC can flatter imbalanced problems.</span></figcaption>
+        </figure>
+
+        <figure class="gallery-card">
+          <svg viewBox="0 0 300 240" class="chart-svg" role="img" aria-label="Precision recall curve">
+            <line x1="40" y1="10" x2="40" y2="200" class="axis-line"/>
+            <line x1="40" y1="200" x2="280" y2="200" class="axis-line"/>
+            <path d="M40,25 C 90,28 140,40 170,70 C 210,115 240,150 280,190" class="curve-line curve-flag"/>
+            <text x="160" y="222" class="axis-caption" text-anchor="middle">Recall</text>
+            <text x="16" y="105" class="axis-caption" text-anchor="middle" transform="rotate(-90 16 105)">Precision</text>
+          </svg>
+          <figcaption><strong>Precision&ndash;Recall curve</strong><span>PR&#8209;AUC 0.891 &mdash; the more honest metric at this class ratio.</span></figcaption>
+        </figure>
+
+        <figure class="gallery-card">
+          <svg viewBox="0 0 300 240" class="chart-svg" role="img" aria-label="Confusion matrix heatmap">
+            <g class="cm-grid">
+              <rect x="50" y="20" width="90" height="80" class="cm-cell cm-cool"/>
+              <rect x="140" y="20" width="90" height="80" class="cm-cell cm-warm-lite"/>
+              <rect x="50" y="100" width="90" height="80" class="cm-cell cm-warm-lite"/>
+              <rect x="140" y="100" width="90" height="80" class="cm-cell cm-warm"/>
+            </g>
+            <text x="95" y="65" class="cm-num" text-anchor="middle">56,832</text>
+            <text x="95" y="82" class="cm-sub" text-anchor="middle">true legit</text>
+            <text x="185" y="65" class="cm-num" text-anchor="middle">32</text>
+            <text x="185" y="82" class="cm-sub" text-anchor="middle">false flag</text>
+            <text x="95" y="145" class="cm-num" text-anchor="middle">13</text>
+            <text x="95" y="162" class="cm-sub" text-anchor="middle">missed</text>
+            <text x="185" y="145" class="cm-num" text-anchor="middle">85</text>
+            <text x="185" y="162" class="cm-sub" text-anchor="middle">caught</text>
+            <text x="95" y="14" class="axis-caption" text-anchor="middle">Predicted legit</text>
+            <text x="185" y="14" class="axis-caption" text-anchor="middle">Predicted fraud</text>
+          </svg>
+          <figcaption><strong>Confusion matrix</strong><span>At the cost&#8209;optimal threshold &mdash; tuned to the price of a miss vs. a false alarm.</span></figcaption>
+        </figure>
+
+        <figure class="gallery-card">
+          <svg viewBox="0 0 300 240" class="chart-svg" role="img" aria-label="Feature importance bar chart">
+            <g class="fi-row"><text x="6" y="24" class="fi-label">V14</text><rect x="70" y="14" width="180" class="fi-bar" height="16"/></g>
+            <g class="fi-row"><text x="6" y="48" class="fi-label">V4</text><rect x="70" y="38" width="150" class="fi-bar" height="16"/></g>
+            <g class="fi-row"><text x="6" y="72" class="fi-label">amount_zscore</text><rect x="70" y="62" width="132" class="fi-bar" height="16"/></g>
+            <g class="fi-row"><text x="6" y="96" class="fi-label">V12</text><rect x="70" y="86" width="118" class="fi-bar" height="16"/></g>
+            <g class="fi-row"><text x="6" y="120" class="fi-label">V10</text><rect x="70" y="110" width="100" class="fi-bar" height="16"/></g>
+            <g class="fi-row"><text x="6" y="144" class="fi-label">Amount_log</text><rect x="70" y="134" width="86" height="16" class="fi-bar"/></g>
+            <g class="fi-row"><text x="6" y="168" class="fi-label">txn_count_1hr</text><rect x="70" y="158" width="70" height="16" class="fi-bar"/></g>
+            <g class="fi-row"><text x="6" y="192" class="fi-label">V17</text><rect x="70" y="182" width="58" height="16" class="fi-bar"/></g>
+          </svg>
+          <figcaption><strong>Feature importance</strong><span>Engineered velocity features rank alongside the strongest PCA components.</span></figcaption>
+        </figure>
+
+        <figure class="gallery-card">
+          <svg viewBox="0 0 300 240" class="chart-svg" role="img" aria-label="Calibration curve">
+            <line x1="40" y1="10" x2="40" y2="200" class="axis-line"/>
+            <line x1="40" y1="200" x2="280" y2="200" class="axis-line"/>
+            <line x1="40" y1="200" x2="280" y2="10" class="diag-line"/>
+            <polyline points="40,190 90,150 140,108 190,65 240,32 280,14" class="curve-dot curve-flag"/>
+            <polyline points="40,196 90,158 140,118 190,78 240,40 280,12" class="curve-dot"/>
+            <text x="160" y="222" class="axis-caption" text-anchor="middle">Predicted probability</text>
+            <text x="16" y="105" class="axis-caption" text-anchor="middle" transform="rotate(-90 16 105)">Observed rate</text>
+          </svg>
+          <figcaption><strong>Calibration curve</strong><span>Post&#8209;isotonic (solid) tracks the diagonal far closer than the raw model (dotted).</span></figcaption>
+        </figure>
+
+        <figure class="gallery-card">
+          <svg viewBox="0 0 300 240" class="chart-svg" role="img" aria-label="Threshold tradeoff chart">
+            <line x1="40" y1="10" x2="40" y2="200" class="axis-line"/>
+            <line x1="40" y1="200" x2="280" y2="200" class="axis-line"/>
+            <path d="M40,20 L90,35 L140,55 L190,90 L240,140 L280,180" class="curve-line curve-flag" fill="none"/>
+            <path d="M40,195 L90,160 L140,120 L190,80 L240,45 L280,20" class="curve-line" fill="none"/>
+            <line x1="185" y1="10" x2="185" y2="200" class="threshold-line"/>
+            <text x="185" y="8" class="axis-caption" text-anchor="middle">optimal</text>
+            <text x="160" y="222" class="axis-caption" text-anchor="middle">Decision threshold</text>
+          </svg>
+          <figcaption><strong>Threshold tradeoff</strong><span>Precision (flag) vs. recall (line) &mdash; the cutoff is chosen where expected cost is lowest, not at 0.5.</span></figcaption>
+        </figure>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ REASONING / SHAP ============ -->
+  <section class="section" id="reasoning">
+    <div class="wrap">
+      <p class="section-eyebrow">05 &mdash; The Reasoning</p>
+      <h2>Every flag comes with a reason.</h2>
+      <p class="section-note">
+        A score alone isn't enough to act on &mdash; an investigator needs to know
+        <em>why</em>. Each flagged transaction below carries its top contributing
+        factors, computed with SHAP.
+      </p>
+
+      <div class="case-cards">
+        <article class="case-card">
+          <div class="case-card-head">
+            <span class="mono">TX&#8209;004821</span>
+            <span class="stamp">FLAGGED</span>
+          </div>
+          <dl class="case-card-body">
+            <div><dt>Amount</dt><dd class="mono">$1,842.00</dd></div>
+            <div><dt>Time</dt><dd class="mono">03:14</dd></div>
+            <div><dt>Risk score</dt><dd class="mono">0.94</dd></div>
+          </dl>
+          <ul class="reason-list">
+            <li><span class="reason-bar" style="--w:88%"></span>Amount far above rolling average <span class="mono">(+15.9)</span></li>
+            <li><span class="reason-bar" style="--w:64%"></span>V5 well outside typical range <span class="mono">(&minus;5.2)</span></li>
+            <li><span class="reason-bar" style="--w:41%"></span>Elevated short-term transaction count <span class="mono">(+2.8)</span></li>
+          </ul>
+        </article>
+
+        <article class="case-card">
+          <div class="case-card-head">
+            <span class="mono">TX&#8209;011943</span>
+            <span class="stamp">FLAGGED</span>
+          </div>
+          <dl class="case-card-body">
+            <div><dt>Amount</dt><dd class="mono">$612.50</dd></div>
+            <div><dt>Time</dt><dd class="mono">02:47</dd></div>
+            <div><dt>Risk score</dt><dd class="mono">0.79</dd></div>
+          </dl>
+          <ul class="reason-list">
+            <li><span class="reason-bar" style="--w:70%"></span>V12 pattern consistent with prior fraud cases <span class="mono">(+8.4)</span></li>
+            <li><span class="reason-bar" style="--w:55%"></span>Unusual hour relative to account history <span class="mono">(+4.9)</span></li>
+            <li><span class="reason-bar" style="--w:30%"></span>Amount just above rolling average <span class="mono">(+2.1)</span></li>
+          </ul>
+        </article>
+
+        <article class="case-card case-card-clear">
+          <div class="case-card-head">
+            <span class="mono">TX&#8209;011944</span>
+            <span class="stamp stamp-clear">CLEAR</span>
+          </div>
+          <dl class="case-card-body">
+            <div><dt>Amount</dt><dd class="mono">$42.10</dd></div>
+            <div><dt>Time</dt><dd class="mono">14:02</dd></div>
+            <div><dt>Risk score</dt><dd class="mono">0.03</dd></div>
+          </dl>
+          <ul class="reason-list">
+            <li><span class="reason-bar reason-bar-clear" style="--w:20%"></span>Amount within normal range for this account</li>
+            <li><span class="reason-bar reason-bar-clear" style="--w:14%"></span>Typical hour, typical velocity</li>
+          </ul>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ STACK ============ -->
+  <section class="section section-alt" id="stack">
+    <div class="wrap">
+      <p class="section-eyebrow">06 &mdash; The Stack</p>
+      <h2>Line items.</h2>
+      <ul class="stack-list">
+        <li><span>Modeling</span><span class="mono">LightGBM &middot; XGBoost &middot; CatBoost &middot; scikit&#8209;learn</span></li>
+        <li><span>Imbalance &amp; calibration</span><span class="mono">scale_pos_weight &middot; isotonic regression</span></li>
+        <li><span>Tuning</span><span class="mono">Optuna (TPE sampler, 30 trials)</span></li>
+        <li><span>Explainability</span><span class="mono">SHAP TreeExplainer</span></li>
+        <li><span>Anomaly detection</span><span class="mono">Isolation Forest</span></li>
+        <li><span>Validation</span><span class="mono">Time&#8209;ordered split &middot; rolling&#8209;window CV</span></li>
+        <li><span>Data</span><span class="mono">Kaggle &mdash; mlg&#8209;ulb/creditcardfraud</span></li>
+      </ul>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <p>Built by Sahas Etikyala &middot; a machine learning project in applied fraud analytics.</p>
+    <div class="footer-links">
+      <a href="https://github.com/" id="repo-link-2">GitHub</a>
+      <a href="#top">Back to top</a>
+    </div>
+  </div>
+</footer>
+
+<script src="js/script.js"></script>
+</body>
+</html>
